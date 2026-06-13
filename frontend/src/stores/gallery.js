@@ -46,7 +46,7 @@ export const useGalleryStore = defineStore('gallery', {
         const fetched = data.photos || []
         this.photos = fetched
         this.total = data.total
-        if (fetched.length < this.cols * 5) {
+        if (fetched.length >= data.total) {
           this.allLoaded = true
         }
       } catch (e) {
