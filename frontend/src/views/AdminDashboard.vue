@@ -311,6 +311,14 @@ function handleLogout() {
   display: flex;
   flex-direction: column;
   flex-shrink: 0;
+  min-height: 100%;
+}
+
+.sidebar-nav {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
 }
 
 .sidebar-user {
