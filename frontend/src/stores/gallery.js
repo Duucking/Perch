@@ -13,7 +13,7 @@ export const useGalleryStore = defineStore('gallery', {
     darkMode: window.matchMedia('(prefers-color-scheme: dark)').matches,
     searchQuery: '',
     cols: 4,
-    perPageAdmin: 50
+    perPageAdmin: 10
   }),
 
   actions: {

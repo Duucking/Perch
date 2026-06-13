@@ -69,6 +69,15 @@
           <button :disabled="galleryStore.page <= 1" @click="galleryStore.setAdminPage(galleryStore.page - 1)" class="page-btn">←</button>
           <span class="page-info">{{ galleryStore.page }} / {{ galleryStore.totalPages }}</span>
           <button :disabled="galleryStore.page >= galleryStore.totalPages" @click="galleryStore.setAdminPage(galleryStore.page + 1)" class="page-btn">→</button>
+          <span class="page-size-sep">|</span>
+          <label class="page-size-label">每页</label>
+          <select v-model="galleryStore.perPageAdmin" @change="galleryStore.fetchAdminPhotos()" class="page-size-select">
+            <option :value="10">10</option>
+            <option :value="20">20</option>
+            <option :value="50">50</option>
+            <option :value="100">100</option>
+          </select>
+          <span class="page-size-label">条</span>
         </div>
       </div>
 
@@ -669,6 +678,31 @@ function handleLogout() {
 .page-info {
   font-size: 12px;
   color: var(--text-muted);
+}
+
+.page-size-sep {
+  color: var(--border);
+  font-size: 12px;
+}
+
+.page-size-label {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.page-size-select {
+  padding: 4px 8px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--bg-card);
+  color: var(--text-primary);
+  font-size: 12px;
+  outline: none;
+  cursor: pointer;
+}
+
+.page-size-select:focus {
+  border-color: var(--accent);
 }
 
 /* Scan tab */

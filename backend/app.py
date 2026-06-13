@@ -22,6 +22,7 @@ CORS(app, origins=cors_origins, supports_credentials=True, expose_headers=['Cont
 app.config['SECRET_KEY'] = secrets.token_hex(32)
 
 scan_lock = threading.Lock()
+TOKEN_EXPIRE_HOURS = 24
 
 TOKENS = {}
 
