@@ -98,9 +98,9 @@ const modalPhotoId = ref(0)
 const containerWidth = ref(0)
 const gap = 20
 let searchTimer = null
-let observer = null
 let resizeTimer = null
 let layoutTimer = null
+let scrollTimer = null
 
 const columnCount = computed(() => {
   const w = windowWidth.value
@@ -196,31 +196,35 @@ watch(columnCount, async (n) => {
   layout()
 })
 
+function checkLoadMore() {
+  if (store.loadingMore || store.allLoaded) return
+  if (!sentinel.value) return
+  const rect = sentinel.value.getBoundingClientRect()
+  if (rect.top < window.innerHeight + 400) {
+    store.loadMore()
+  }
+}
+
 onMounted(async () => {
   store.setCols(columnCount.value)
   store.fetchPhotos()
   await nextTick()
 
-  observer = new IntersectionObserver(
-    (entries) => {
-      if (entries[0].isIntersecting && !store.loadingMore && !store.allLoaded) {
-        store.loadMore()
-      }
-    },
-    { rootMargin: '300px' }
-  )
-
-  if (sentinel.value) observer.observe(sentinel.value)
-
+  window.addEventListener('scroll', onScroll)
   window.addEventListener('resize', onResize)
 })
 
 onUnmounted(() => {
-  observer?.disconnect()
+  window.removeEventListener('scroll', onScroll)
   window.removeEventListener('resize', onResize)
   clearTimeout(resizeTimer)
-  clearTimeout(layoutTimer)
+  clearTimeout(scrollTimer)
 })
+
+function onScroll() {
+  clearTimeout(scrollTimer)
+  scrollTimer = setTimeout(checkLoadMore, 100)
+}
 
 function onResize() {
   clearTimeout(resizeTimer)
