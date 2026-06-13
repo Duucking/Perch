@@ -4,6 +4,7 @@ export const useGalleryStore = defineStore('gallery', {
   state: () => ({
     photos: [],
     total: 0,
+    totalPages: 0,
     page: 1,
     loading: false,
     loadingMore: false,
@@ -11,7 +12,8 @@ export const useGalleryStore = defineStore('gallery', {
     stats: { total_photos: 0, total_size: 0, last_scan: null },
     darkMode: window.matchMedia('(prefers-color-scheme: dark)').matches,
     searchQuery: '',
-    cols: 4
+    cols: 4,
+    perPageAdmin: 50
   }),
 
   actions: {
@@ -103,6 +105,35 @@ export const useGalleryStore = defineStore('gallery', {
     setSearch(q) {
       this.searchQuery = q
       this.fetchPhotos()
+    },
+
+    async fetchAdminPhotos(page = 1) {
+      this.loading = true
+      this.page = page
+      try {
+        const params = new URLSearchParams({
+          page,
+          per_page: this.perPageAdmin,
+          sort: 'scanned_at',
+          order: 'desc'
+        })
+        if (this.searchQuery) params.set('search', this.searchQuery)
+
+        const res = await fetch(`/api/photos?${params}`)
+        const data = await res.json()
+        this.photos = data.photos || []
+        this.total = data.total
+        this.totalPages = data.total_pages || 1
+      } catch (e) {
+        console.error('Failed to fetch admin photos:', e)
+      } finally {
+        this.loading = false
+      }
+    },
+
+    setAdminPage(p) {
+      if (p < 1 || p > this.totalPages) return
+      this.fetchAdminPhotos(p)
     }
   }
 })

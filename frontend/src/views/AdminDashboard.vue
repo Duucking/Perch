@@ -66,9 +66,9 @@
           </div>
         </div>
         <div v-if="galleryStore.totalPages > 1" class="table-pagination">
-          <button :disabled="galleryStore.page <= 1" @click="galleryStore.setPage(galleryStore.page - 1)" class="page-btn">←</button>
+          <button :disabled="galleryStore.page <= 1" @click="galleryStore.setAdminPage(galleryStore.page - 1)" class="page-btn">←</button>
           <span class="page-info">{{ galleryStore.page }} / {{ galleryStore.totalPages }}</span>
-          <button :disabled="galleryStore.page >= galleryStore.totalPages" @click="galleryStore.setPage(galleryStore.page + 1)" class="page-btn">→</button>
+          <button :disabled="galleryStore.page >= galleryStore.totalPages" @click="galleryStore.setAdminPage(galleryStore.page + 1)" class="page-btn">→</button>
         </div>
       </div>
 
@@ -178,14 +178,17 @@ onMounted(async () => {
     router.replace('/admin')
     return
   }
-  galleryStore.fetchPhotos()
+  galleryStore.fetchAdminPhotos()
   profile.value.username = auth.user?.username || ''
   profile.value.displayName = auth.user?.display_name || ''
 })
 
 function onSearch() {
   clearTimeout(searchTimer)
-  searchTimer = setTimeout(() => galleryStore.setSearch(searchQuery.value), 400)
+  searchTimer = setTimeout(() => {
+    galleryStore.searchQuery = searchQuery.value
+    galleryStore.fetchAdminPhotos()
+  }, 400)
 }
 
 function getThumbUrl(path) {
@@ -238,7 +241,7 @@ async function startScan() {
     const result = await auth.scanDirectory(scanPath.value.trim())
     scanResult.value = `扫描完成，新增 ${result.added} 张照片`
     galleryStore.fetchStats()
-    galleryStore.fetchPhotos()
+    galleryStore.fetchAdminPhotos(galleryStore.page)
   } catch (e) {
     scanResult.value = '扫描失败：' + e.message
   } finally {
@@ -254,7 +257,7 @@ async function doDelete() {
   if (!deleteTarget.value) return
   try {
     await auth.deletePhoto(deleteTarget.value.id)
-    galleryStore.fetchPhotos()
+    galleryStore.fetchAdminPhotos(galleryStore.page)
     galleryStore.fetchStats()
   } catch (e) {
     alert('删除失败')
