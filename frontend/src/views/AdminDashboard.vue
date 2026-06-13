@@ -78,30 +78,15 @@
           <h2>目录扫描</h2>
         </div>
         <div class="scan-body">
-          <div class="dir-input">
-            <input v-model="currentPath" type="text" placeholder="输入目录路径..." @keyup.enter="browseDir(currentPath)" />
-            <button class="btn-go" @click="browseDir(currentPath)">浏览</button>
-          </div>
-          <div class="dir-list" v-if="dirs.length">
-            <button v-for="d in dirs" :key="d" class="dir-item" @click="selectDir(d)">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
-              <span>{{ d }}</span>
+          <div class="scan-form">
+            <label class="scan-label">图片存放路径</label>
+            <input v-model="scanPath" type="text" placeholder="例如: /mnt/photos 或 /home/user/Pictures" class="scan-path-input" />
+            <p class="scan-hint">输入服务器上存放照片的目录完整路径，系统将递归扫描该目录下的所有图片</p>
+            <button class="btn-scan-start" :disabled="!scanPath || scanning" @click="startScan">
+              <span v-if="scanning" class="scanning"><span class="spinner"></span> 扫描中...</span>
+              <span v-else>开始扫描</span>
             </button>
           </div>
-          <div class="dir-list" v-if="drives.length">
-            <button v-for="d in drives" :key="d" class="dir-item" @click="selectDir(d)">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><path d="M8 21h8"/><path d="M12 17v4"/></svg>
-              <span>{{ d }}</span>
-            </button>
-          </div>
-          <div v-if="selectedDir" class="selected-dir">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
-            {{ selectedDir }}
-          </div>
-          <button class="btn-scan-start" :disabled="!selectedDir || scanning" @click="startScan">
-            <span v-if="scanning" class="scanning"><span class="spinner"></span> 扫描中...</span>
-            <span v-else>开始扫描</span>
-          </button>
           <div v-if="scanResult" class="scan-result">{{ scanResult }}</div>
         </div>
       </div>
@@ -169,10 +154,7 @@ const editText = ref('')
 let searchTimer = null
 
 // Scan
-const currentPath = ref('')
-const selectedDir = ref('')
-const dirs = ref([])
-const drives = ref([])
+const scanPath = ref('')
 const scanning = ref(false)
 const scanResult = ref('')
 
@@ -249,25 +231,11 @@ async function saveDesc(photo) {
   }
 }
 
-async function browseDir(path) {
-  currentPath.value = path
-  selectedDir.value = path
-  try {
-    const data = await auth.fetchSuggestDirs(path)
-    if (data.directories) dirs.value = data.directories
-    if (data.drives) drives.value = data.drives
-  } catch { }
-}
-
-function selectDir(path) {
-  browseDir(path)
-}
-
 async function startScan() {
   scanning.value = true
   scanResult.value = ''
   try {
-    const result = await auth.scanDirectory(selectedDir.value)
+    const result = await auth.scanDirectory(scanPath.value.trim())
     scanResult.value = `扫描完成，新增 ${result.added} 张照片`
     galleryStore.fetchStats()
     galleryStore.fetchPhotos()
@@ -668,84 +636,42 @@ function handleLogout() {
 
 /* Scan tab */
 .scan-body {
-  max-width: 480px;
+  max-width: 520px;
 }
 
-.dir-input {
+.scan-form {
   display: flex;
-  gap: 8px;
-  margin-bottom: 12px;
+  flex-direction: column;
+  gap: 12px;
 }
 
-.dir-input input {
-  flex: 1;
-  padding: 10px 14px;
+.scan-label {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.scan-path-input {
+  padding: 12px 16px;
   border: 1px solid var(--border);
   border-radius: 8px;
   background: var(--bg-card);
   color: var(--text-primary);
-  font-size: 13px;
+  font-size: 14px;
+  font-family: 'Inter', monospace;
   outline: none;
+  transition: border-color 0.3s;
 }
 
-.dir-input input:focus {
+.scan-path-input:focus {
   border-color: var(--accent);
 }
 
-.btn-go {
-  padding: 10px 16px;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  background: var(--bg-card);
-  color: var(--text-secondary);
-  cursor: pointer;
-  font-size: 13px;
-  transition: all 0.3s;
-}
-
-.btn-go:hover {
-  border-color: var(--accent);
-  color: var(--accent);
-}
-
-.dir-list {
-  max-height: 200px;
-  overflow-y: auto;
-  margin-bottom: 12px;
-}
-
-.dir-item {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  width: 100%;
-  padding: 8px 12px;
-  border: none;
-  background: transparent;
-  color: var(--text-secondary);
-  font-size: 13px;
-  cursor: pointer;
-  border-radius: 6px;
-  text-align: left;
-  transition: all 0.2s;
-}
-
-.dir-item:hover {
-  background: var(--bg-secondary);
-  color: var(--text-primary);
-}
-
-.selected-dir {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 8px 12px;
-  background: var(--bg-secondary);
-  border-radius: 6px;
+.scan-hint {
   font-size: 12px;
   color: var(--text-muted);
-  word-break: break-all;
-  margin-bottom: 12px;
+  line-height: 1.5;
+  margin: 0;
 }
 
 .btn-scan-start {
@@ -759,6 +685,7 @@ function handleLogout() {
   font-weight: 500;
   cursor: pointer;
   transition: all 0.3s;
+  margin-top: 4px;
 }
 
 .btn-scan-start:hover:not(:disabled) {
@@ -792,7 +719,7 @@ function handleLogout() {
 }
 
 .scan-result {
-  margin-top: 12px;
+  margin-top: 16px;
   padding: 12px;
   background: var(--bg-secondary);
   border-radius: 8px;
