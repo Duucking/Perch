@@ -43,8 +43,12 @@ export const useGalleryStore = defineStore('gallery', {
 
         const res = await fetch(`/api/photos?${params}`)
         const data = await res.json()
-        this.photos = data.photos
+        const fetched = data.photos || []
+        this.photos = fetched
         this.total = data.total
+        if (fetched.length < this.cols * 5) {
+          this.allLoaded = true
+        }
       } catch (e) {
         console.error('Failed to fetch photos:', e)
       } finally {
@@ -54,6 +58,10 @@ export const useGalleryStore = defineStore('gallery', {
 
     async loadMore() {
       if (this.loadingMore || this.allLoaded) return
+      if (this.photos.length >= this.total) {
+        this.allLoaded = true
+        return
+      }
       this.loadingMore = true
       this.page += 1
       try {
@@ -67,10 +75,12 @@ export const useGalleryStore = defineStore('gallery', {
 
         const res = await fetch(`/api/photos?${params}`)
         const data = await res.json()
-        const newPhotos = data.photos || []
+        const newPhotos = (data.photos || []).filter(
+          p => !this.photos.some(existing => existing.id === p.id)
+        )
         this.photos = [...this.photos, ...newPhotos]
         this.total = data.total
-        if (!newPhotos.length) {
+        if (!newPhotos.length || this.photos.length >= this.total) {
           this.allLoaded = true
         }
       } catch (e) {
