@@ -177,16 +177,16 @@ function layout() {
   masonryRef.value.style.height = `${Math.max(...heights, 0)}px`
 }
 
-watch(() => store.photos.length, async () => {
+watch([() => store.photos.length, () => store.loadingMore], async () => {
   await nextTick()
   layout()
   await nextTick()
-  if (!store.allLoaded && !store.loadingMore && sentinel.value) {
-    const rect = sentinel.value.getBoundingClientRect()
-    const wp = window.innerHeight + 300
-    if (rect.top < wp) {
-      store.loadMore()
-    }
+  if (store.loadingMore || store.allLoaded) return
+  if (!sentinel.value) return
+  const rect = sentinel.value.getBoundingClientRect()
+  const wp = window.innerHeight + 300
+  if (rect.top < wp) {
+    store.loadMore()
   }
 })
 
