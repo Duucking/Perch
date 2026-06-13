@@ -32,85 +32,207 @@
         </svg>
       </div>
       <h2>还没有照片</h2>
-      <p>点击右上角的 <strong>+</strong> 按钮扫描目录添加照片</p>
+      <p>请联系管理员扫描目录添加照片</p>
     </div>
 
-    <transition-group
-      v-else
-      name="scale-in"
-      tag="div"
-      class="photo-grid"
-      appear
-    >
+    <div v-else ref="masonryRef" class="photo-masonry" :style="{ position: 'relative', width: '100%', height: masonryHeight }">
       <div
-        v-for="(photo, index) in store.photos"
-        :key="photo.id"
-        class="photo-card"
-        :style="{ '--delay': `${index * 0.05}s` }"
-        @click="openDetail(photo.id)"
+        v-for="(item, index) in positionedItems"
+        :key="item.photo.id"
+        class="masonry-item"
+        :style="item.style"
+        @click="openModal(item.photo.id)"
       >
-        <div class="card-image-wrapper">
-          <div
-            class="card-image"
-            :style="{
-              backgroundImage: `url(${getThumbUrl(photo.thumbnail_path)})`,
-              aspectRatio: photo.width / photo.height
-            }"
-          >
-            <div class="card-overlay">
-              <div class="card-info">
-                <span class="card-name">{{ photo.filename }}</span>
-                <span class="card-dimensions">{{ photo.width }} × {{ photo.height }}</span>
-              </div>
+        <div class="masonry-card">
+          <div class="masonry-img-wrap" :style="imgWrapStyle(item.photo)">
+            <img
+              :src="getThumbUrl(item.photo.thumbnail_path)"
+              :alt="item.photo.filename"
+              class="masonry-img"
+              @load="onImgLoad($event)"
+              @error="onImgLoad($event)"
+            />
+            <div class="img-skeleton"></div>
+          </div>
+          <div class="card-overlay">
+            <div class="card-info">
+              <span class="card-name">{{ item.photo.filename }}</span>
+              <span class="card-dimensions">{{ item.photo.width }} × {{ item.photo.height }}</span>
             </div>
           </div>
         </div>
       </div>
-    </transition-group>
 
-    <div v-if="store.totalPages > 1" class="pagination">
-      <button
-        :disabled="store.page <= 1"
-        @click="store.setPage(store.page - 1)"
-        class="page-btn"
-      >
-        ← 上一页
-      </button>
-      <span class="page-info">{{ store.page }} / {{ store.totalPages }}</span>
-      <button
-        :disabled="store.page >= store.totalPages"
-        @click="store.setPage(store.page + 1)"
-        class="page-btn"
-      >
-        下一页 →
-      </button>
+      </div>
+
+    <PhotoModal :visible="modalVisible" :photo-id="modalPhotoId" @close="closeModal" />
+
+    <div ref="sentinel" class="sentinel"></div>
+
+    <div v-if="store.loadingMore" class="loading-mask">
+      <div class="loading-mask-inner">
+        <div class="loading-spinner"></div>
+        <p>正在加载...</p>
+      </div>
     </div>
 
-    <div v-if="store.loading && store.photos.length" class="loading-more">
-      <div class="loading-spinner"></div>
+    <div v-if="store.allLoaded && store.photos.length" class="end-message">
+      — 已显示全部 {{ store.total }} 张照片 —
     </div>
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted, watch } from 'vue'
-import { useRouter } from 'vue-router'
+import { ref, computed, onMounted, onUnmounted, nextTick, watch } from 'vue'
 import { useGalleryStore } from '../stores/gallery'
+import PhotoModal from '../components/PhotoModal.vue'
 
 const store = useGalleryStore()
-const router = useRouter()
 const searchInput = ref('')
+const sentinel = ref(null)
+const masonryRef = ref(null)
+const windowWidth = ref(window.innerWidth)
+const colWidth = ref(260)
+const modalVisible = ref(false)
+const modalPhotoId = ref(0)
+const containerWidth = ref(0)
+const gap = 20
 let searchTimer = null
+let observer = null
+let resizeTimer = null
+let layoutTimer = null
 
-onMounted(() => {
-  store.fetchPhotos()
+const columnCount = computed(() => {
+  const w = windowWidth.value
+  if (w > 1200) return 4
+  if (w > 900) return 3
+  if (w > 480) return 2
+  return 1
 })
+
+function calcColWidth() {
+  if (!masonryRef.value) return
+  const rect = masonryRef.value.getBoundingClientRect()
+  containerWidth.value = rect.width
+  const cols = columnCount.value
+  colWidth.value = (rect.width - gap * (cols - 1)) / cols
+}
+
+const positionedItems = computed(() => {
+  const cols = columnCount.value
+  const w = colWidth.value
+  const heights = new Array(cols).fill(0)
+
+  return store.photos.map((photo, i) => {
+    const col = i % cols
+    const row = Math.floor(i / cols)
+    const aspect = photo.width / photo.height || 1
+    const cardH = w / aspect
+    const top = heights[col]
+    heights[col] += cardH + gap
+
+    return {
+      photo,
+      style: {
+        position: 'absolute',
+        width: `${w}px`,
+        left: `${col * (w + gap)}px`,
+        top: `${top}px`,
+        '--delay': `${row * 0.06}s`
+      }
+    }
+  })
+})
+
+const masonryHeight = computed(() => {
+  if (!positionedItems.value.length) return '0px'
+  const cols = columnCount.value
+  const w = colWidth.value
+  const heights = new Array(cols).fill(0)
+  for (const item of positionedItems.value) {
+    const col = store.photos.indexOf(item.photo) % cols
+    const aspect = item.photo.width / item.photo.height || 1
+    heights[col] += w / aspect + gap
+  }
+  return `${Math.max(...heights)}px`
+})
+
+function layout() {
+  if (!masonryRef.value) return
+  calcColWidth()
+
+  const cols = columnCount.value
+  const w = colWidth.value
+  const heights = new Array(cols).fill(0)
+  const cards = masonryRef.value.querySelectorAll('.masonry-item')
+
+  cards.forEach((el, i) => {
+    const col = i % cols
+    el.style.width = `${w}px`
+    el.style.left = `${col * (w + gap)}px`
+    el.style.top = `${heights[col]}px`
+    heights[col] += el.offsetHeight + gap
+  })
+
+  masonryRef.value.style.height = `${Math.max(...heights, 0)}px`
+}
+
+watch(() => store.photos.length, async () => {
+  await nextTick()
+  layout()
+})
+
+watch(columnCount, async (n) => {
+  store.setCols(n)
+  await nextTick()
+  layout()
+})
+
+onMounted(async () => {
+  store.setCols(columnCount.value)
+  store.fetchPhotos()
+  await nextTick()
+
+  observer = new IntersectionObserver(
+    (entries) => {
+      if (entries[0].isIntersecting && !store.loadingMore && !store.allLoaded) {
+        store.loadMore()
+      }
+    },
+    { rootMargin: '300px' }
+  )
+
+  if (sentinel.value) observer.observe(sentinel.value)
+
+  window.addEventListener('resize', onResize)
+})
+
+onUnmounted(() => {
+  observer?.disconnect()
+  window.removeEventListener('resize', onResize)
+  clearTimeout(resizeTimer)
+  clearTimeout(layoutTimer)
+})
+
+function onResize() {
+  clearTimeout(resizeTimer)
+  resizeTimer = setTimeout(() => {
+    windowWidth.value = window.innerWidth
+    nextTick(() => layout())
+  }, 150)
+}
 
 function onSearchInput() {
   clearTimeout(searchTimer)
   searchTimer = setTimeout(() => {
     store.setSearch(searchInput.value)
   }, 400)
+}
+
+function imgWrapStyle(photo) {
+  const w = colWidth.value || 260
+  const h = w / (photo.width / photo.height || 1)
+  return { height: `${h}px` }
 }
 
 function getThumbUrl(path) {
@@ -120,8 +242,24 @@ function getThumbUrl(path) {
   return `/api/thumbnails/${filename}`
 }
 
-function openDetail(id) {
-  router.push({ name: 'photo-detail', params: { id } })
+function onImgLoad(e) {
+  e.target.classList.add('loaded')
+  if (!layoutTimer) {
+    layoutTimer = setTimeout(() => {
+      layout()
+      layoutTimer = null
+    }, 80)
+  }
+}
+
+function openModal(id) {
+  modalPhotoId.value = id
+  modalVisible.value = true
+}
+
+function closeModal() {
+  modalVisible.value = false
+  modalPhotoId.value = 0
 }
 </script>
 
@@ -130,6 +268,12 @@ function openDetail(id) {
   max-width: 1400px;
   margin: 0 auto;
   padding: 40px 32px 80px;
+}
+
+@media (max-width: 600px) {
+  .gallery {
+    padding: 24px 16px 80px;
+  }
 }
 
 .gallery-header {
@@ -141,6 +285,27 @@ function openDetail(id) {
   align-items: flex-end;
   justify-content: space-between;
   gap: 24px;
+}
+
+@media (max-width: 600px) {
+  .header-content {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 16px;
+  }
+  .gallery-title {
+    font-size: 24px;
+  }
+  .search-box {
+    max-width: 100%;
+    width: 100%;
+  }
+  .search-box input {
+    width: 100%;
+  }
+  .search-box input:focus {
+    width: 100%;
+  }
 }
 
 .gallery-title {
@@ -176,8 +341,13 @@ function openDetail(id) {
   pointer-events: none;
 }
 
+.search-box {
+  max-width: 60vw;
+}
+
 .search-box input {
-  width: 240px;
+  width: 200px;
+  max-width: 100%;
   padding: 10px 14px 10px 40px;
   border: 1px solid var(--border);
   border-radius: 24px;
@@ -189,7 +359,8 @@ function openDetail(id) {
 }
 
 .search-box input:focus {
-  width: 300px;
+  width: 260px;
+  max-width: 100%;
   border-color: var(--accent);
   box-shadow: 0 0 0 3px var(--shadow);
 }
@@ -198,41 +369,89 @@ function openDetail(id) {
   color: var(--text-muted);
 }
 
-.photo-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-  gap: 20px;
+.photo-masonry {
+  position: relative;
+  width: 100%;
 }
 
-.photo-card {
+.masonry-item {
+  position: absolute;
   cursor: pointer;
+  animation: card-enter 0.7s cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation-delay: var(--delay);
+  will-change: transform, opacity;
+}
+
+.masonry-card {
+  position: relative;
   border-radius: 12px;
   overflow: hidden;
   background: var(--bg-card);
   border: 1px solid var(--border);
   transition: all 0.5s cubic-bezier(0.16, 1, 0.3, 1);
-  animation-delay: var(--delay);
 }
 
-.photo-card:hover {
+.masonry-card:hover {
   transform: translateY(-6px) scale(1.01);
   box-shadow: 0 16px 48px var(--shadow-strong);
   border-color: var(--accent);
 }
 
-.card-image-wrapper {
+.masonry-img-wrap {
   position: relative;
   overflow: hidden;
+  background: var(--bg-secondary);
 }
 
-.card-image {
+.masonry-img {
+  display: block;
   width: 100%;
-  background-size: cover;
-  background-position: center;
-  transition: transform 0.8s cubic-bezier(0.16, 1, 0.3, 1);
+  height: 100%;
+  object-fit: cover;
+  position: relative;
+  z-index: 1;
+  transition: transform 0.8s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+  opacity: 0;
 }
 
-.photo-card:hover .card-image {
+.masonry-img.loaded {
+  opacity: 1;
+}
+
+.masonry-img.loaded ~ .img-skeleton {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.img-skeleton {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  background: var(--bg-secondary);
+  overflow: hidden;
+  transition: opacity 0.4s;
+}
+
+.img-skeleton::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.3) 50%,
+    transparent 100%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.2s ease-in-out infinite;
+}
+
+@keyframes shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+.masonry-card:hover .masonry-img {
   transform: scale(1.08);
 }
 
@@ -250,7 +469,7 @@ function openDetail(id) {
   align-items: flex-end;
 }
 
-.photo-card:hover .card-overlay {
+.masonry-card:hover .card-overlay {
   opacity: 1;
 }
 
@@ -276,6 +495,17 @@ function openDetail(id) {
   font-size: 11px;
   margin-top: 2px;
   font-weight: 300;
+}
+
+@keyframes card-enter {
+  from {
+    opacity: 0;
+    transform: translateY(30px) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
 }
 
 .loading-state,
@@ -322,45 +552,48 @@ function openDetail(id) {
   color: var(--text-secondary);
 }
 
-.pagination {
+.sentinel {
+  height: 1px;
+}
+
+.loading-mask {
+  min-height: 280px;
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 16px;
-  margin-top: 48px;
+  animation: mask-fade-in 0.4s ease;
+  margin-top: -1px;
 }
 
-.page-btn {
-  padding: 10px 20px;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  background: var(--bg-card);
-  color: var(--text-secondary);
-  cursor: pointer;
-  font-size: 13px;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+.loading-mask-inner {
+  text-align: center;
 }
 
-.page-btn:hover:not(:disabled) {
-  border-color: var(--accent);
-  color: var(--accent);
-  transform: translateY(-1px);
+.loading-mask-inner .loading-spinner {
+  width: 28px;
+  height: 28px;
+  border-width: 2px;
+  margin: 0 auto 12px;
 }
 
-.page-btn:disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
-}
-
-.page-info {
+.loading-mask-inner p {
   font-size: 13px;
   color: var(--text-muted);
   font-weight: 300;
+  letter-spacing: 2px;
 }
 
-.loading-more {
-  display: flex;
-  justify-content: center;
-  padding: 32px;
+@keyframes mask-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.end-message {
+  text-align: center;
+  padding: 48px 32px;
+  font-size: 13px;
+  color: var(--text-muted);
+  font-weight: 300;
+  letter-spacing: 1px;
 }
 </style>

@@ -1,6 +1,6 @@
 <template>
   <div class="app" :class="{ 'dark-mode': store.darkMode }">
-    <nav class="nav">
+    <nav class="nav" v-if="!isAdminRoute">
       <div class="nav-inner">
         <router-link to="/" class="nav-brand" @click="navigateHome">
           <span class="brand-icon">栖</span>
@@ -10,11 +10,6 @@
           <span class="photo-count" v-if="store.total > 0">
             {{ store.total }} 张照片
           </span>
-          <button class="btn-scan" @click="showScan = !showScan" :title="'扫描目录'">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/><path d="M8 11h6"/><path d="M11 8v6"/>
-            </svg>
-          </button>
           <button class="btn-theme" @click="store.toggleDarkMode()" :title="store.darkMode ? '切换亮色模式' : '切换深色模式'">
             <svg v-if="store.darkMode" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/>
@@ -27,9 +22,7 @@
       </div>
     </nav>
 
-    <ScanPanel v-if="showScan" @close="showScan = false" />
-
-    <main class="main-content">
+    <main class="main-content" :class="{ 'no-nav': isAdminRoute }">
       <router-view v-slot="{ Component }">
         <transition name="fade" mode="out-in">
           <component :is="Component" />
@@ -37,25 +30,29 @@
       </router-view>
     </main>
 
-    <footer class="footer">
+    <footer class="footer" v-if="!isAdminRoute">
       <p>栖所 Perch &mdash; 光影之间，片刻永恒</p>
     </footer>
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
-import { useRouter } from 'vue-router'
+import { computed, onMounted } from 'vue'
+import { useRouter, useRoute } from 'vue-router'
 import { useGalleryStore } from './stores/gallery'
-import ScanPanel from './components/ScanPanel.vue'
+import { useAuthStore } from './stores/auth'
 
 const store = useGalleryStore()
+const auth = useAuthStore()
 const router = useRouter()
-const showScan = ref(false)
+const route = useRoute()
 
-onMounted(() => {
+const isAdminRoute = computed(() => route.path.startsWith('/admin'))
+
+onMounted(async () => {
   store.applyTheme()
   store.fetchStats()
+  await auth.restore()
 })
 
 function navigateHome() {
@@ -130,7 +127,6 @@ function navigateHome() {
   letter-spacing: 0.5px;
 }
 
-.btn-scan,
 .btn-theme {
   width: 36px;
   height: 36px;
@@ -145,7 +141,6 @@ function navigateHome() {
   transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-.btn-scan:hover,
 .btn-theme:hover {
   background: var(--accent);
   color: var(--bg-primary);
@@ -156,6 +151,10 @@ function navigateHome() {
 .main-content {
   flex: 1;
   padding-top: 64px;
+}
+
+.main-content.no-nav {
+  padding-top: 0;
 }
 
 .footer {
