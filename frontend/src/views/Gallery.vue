@@ -180,6 +180,14 @@ function layout() {
 watch(() => store.photos.length, async () => {
   await nextTick()
   layout()
+  await nextTick()
+  if (!store.allLoaded && !store.loadingMore && sentinel.value) {
+    const rect = sentinel.value.getBoundingClientRect()
+    const wp = window.innerHeight + 300
+    if (rect.top < wp) {
+      store.loadMore()
+    }
+  }
 })
 
 watch(columnCount, async (n) => {
