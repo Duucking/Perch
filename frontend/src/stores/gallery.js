@@ -69,7 +69,7 @@ export const useGalleryStore = defineStore('gallery', {
       try {
         const params = new URLSearchParams({
           page: this.page,
-          per_page: this.cols * 2,
+          per_page: this.cols * 5,
           sort: 'scanned_at',
           order: 'desc'
         })
@@ -77,9 +77,7 @@ export const useGalleryStore = defineStore('gallery', {
 
         const res = await fetch(`/api/photos?${params}`)
         const data = await res.json()
-        const newPhotos = (data.photos || []).filter(
-          p => !this.photos.some(existing => existing.id === p.id)
-        )
+        const newPhotos = data.photos || []
         this.photos = [...this.photos, ...newPhotos]
         this.total = data.total
         if (!newPhotos.length || this.photos.length >= this.total) {
