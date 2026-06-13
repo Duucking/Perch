@@ -1,19 +1,12 @@
 services:
-  backend:
-    build: ./backend
-    container_name: perch-backend
+  perch:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: perch
     ports:
       - "5000:5000"
     volumes:
       - ./backend/uploads:/app/uploads
       - ./backend/data:/app/data
-    restart: unless-stopped
-
-  frontend:
-    build: ./frontend
-    container_name: perch-frontend
-    ports:
-      - "3000:3000"
-    depends_on:
-      - backend
     restart: unless-stopped

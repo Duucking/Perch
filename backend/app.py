@@ -561,6 +561,24 @@ def api_delete_photo(photo_id):
     return jsonify({'ok': True})
 
 
+# ─── Serve frontend (standalone mode) ──────────────────────────
+
+FRONTEND_DIR = os.path.join(BASE_DIR, '..', 'frontend', 'dist')
+
+
+@app.route('/', defaults={'path': ''})
+@app.route('/<path:path>')
+def serve_frontend(path):
+    if path.startswith('api/'):
+        return jsonify({'error': 'Not found'}), 404
+    if not os.path.isdir(FRONTEND_DIR):
+        return jsonify({'error': 'Frontend not built'}), 404
+    file_path = os.path.join(FRONTEND_DIR, path or 'index.html')
+    if os.path.isfile(file_path):
+        return send_file(file_path)
+    return send_file(os.path.join(FRONTEND_DIR, 'index.html'))
+
+
 if __name__ == '__main__':
     init_db()
     with app.app_context():
