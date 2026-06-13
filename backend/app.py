@@ -13,10 +13,11 @@ from PIL import Image, ExifTags
 from PIL.TiffImagePlugin import IFDRational
 from werkzeug.security import generate_password_hash, check_password_hash
 
-from config import DATABASE, UPLOAD_FOLDER, THUMBNAIL_SIZE, ALLOWED_EXTENSIONS, ALLOWED_ORIGINS, BASE_DIR
+from config import DATABASE, UPLOAD_FOLDER, THUMBNAIL_SIZE, ALLOWED_EXTENSIONS, ALLOWED_ORIGINS, ALLOW_ALL_ORIGINS, BASE_DIR
 
 app = Flask(__name__)
-CORS(app, origins=ALLOWED_ORIGINS, supports_credentials=True, expose_headers=['Content-Disposition'])
+cors_origins = '*' if ALLOW_ALL_ORIGINS else ALLOWED_ORIGINS
+CORS(app, origins=cors_origins, supports_credentials=True, expose_headers=['Content-Disposition'])
 
 app.config['SECRET_KEY'] = secrets.token_hex(32)
 
@@ -29,13 +30,20 @@ TOKENS = {}
 def security_check():
     if request.method == 'OPTIONS':
         return None
-    source = request.headers.get('Origin', '') or request.headers.get('Referer', '') or ''
-    if source:
-        if not any(source.startswith(o) for o in ALLOWED_ORIGINS):
-            return jsonify({'error': 'Forbidden'}), 403
-    xrw = request.headers.get('X-Requested-With', '')
-    if xrw and xrw != 'XMLHttpRequest':
-        return jsonify({'error': 'Invalid request'}), 400
+
+    is_api = request.path.startswith('/api/')
+
+    if not ALLOW_ALL_ORIGINS:
+        source = request.headers.get('Origin', '') or request.headers.get('Referer', '') or ''
+        if source:
+            host = request.headers.get('Host', '')
+            if not any(source.startswith(o) for o in ALLOWED_ORIGINS) and source != f'http://{host}' and source != f'https://{host}':
+                return jsonify({'error': 'Forbidden'}), 403
+
+    if is_api:
+        xrw = request.headers.get('X-Requested-With', '')
+        if xrw and xrw != 'XMLHttpRequest':
+            return jsonify({'error': 'Invalid request'}), 400
     return None
 
 

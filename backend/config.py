@@ -12,3 +12,4 @@ ALLOWED_ORIGINS = [
     'http://localhost:5173',
     'http://localhost',
 ]
+ALLOW_ALL_ORIGINS = True
