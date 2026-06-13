@@ -181,6 +181,7 @@ onMounted(async () => {
   galleryStore.fetchAdminPhotos()
   profile.value.username = auth.user?.username || ''
   profile.value.displayName = auth.user?.display_name || ''
+  loadScanPath()
 })
 
 function onSearch() {
@@ -234,11 +235,36 @@ async function saveDesc(photo) {
   }
 }
 
+async function loadScanPath() {
+  try {
+    const res = await fetch('/api/settings/scan_path', {
+      headers: { Authorization: `Bearer ${auth.token}` }
+    })
+    const data = await res.json()
+    if (data.value) scanPath.value = data.value
+  } catch {}
+}
+
+async function saveScanPath(path) {
+  try {
+    await fetch('/api/settings/scan_path', {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${auth.token}`
+      },
+      body: JSON.stringify({ value: path })
+    })
+  } catch {}
+}
+
 async function startScan() {
   scanning.value = true
   scanResult.value = ''
+  const path = scanPath.value.trim()
   try {
-    const result = await auth.scanDirectory(scanPath.value.trim())
+    const result = await auth.scanDirectory(path)
+    await saveScanPath(path)
     scanResult.value = `扫描完成，新增 ${result.added} 张照片`
     galleryStore.fetchStats()
     galleryStore.fetchAdminPhotos(galleryStore.page)

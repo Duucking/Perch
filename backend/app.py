@@ -49,7 +49,6 @@ def security_check():
 
 def validate_request():
     return None
-TOKEN_EXPIRE_HOURS = 24
 
 
 def get_db():
@@ -93,6 +92,12 @@ def init_db():
             VALUES (?, ?, ?, ?)
         """, ('admin', generate_password_hash('admin123'), '管理员', 'admin'))
 
+    conn.executescript("""
+        CREATE TABLE IF NOT EXISTS settings (
+            key TEXT PRIMARY KEY,
+            value TEXT NOT NULL
+        );
+    """)
     try:
         conn.execute("ALTER TABLE photos ADD COLUMN description TEXT DEFAULT ''")
     except sqlite3.OperationalError:
@@ -493,6 +498,31 @@ def api_stats():
         'total_size': total_size,
         'last_scan': latest['scanned_at'] if latest else None
     })
+
+
+# ─── Settings ──────────────────────────────────────────────────
+
+@app.route('/api/settings/<key>', methods=['GET'])
+def api_get_setting(key):
+    conn = get_db()
+    row = conn.execute("SELECT value FROM settings WHERE key = ?", (key,)).fetchone()
+    conn.close()
+    return jsonify({'key': key, 'value': row['value'] if row else ''})
+
+
+@app.route('/api/settings/<key>', methods=['PUT'])
+@require_admin
+def api_set_setting(key):
+    data = request.get_json(silent=True) or {}
+    value = data.get('value', '')
+    conn = get_db()
+    conn.execute("""
+        INSERT INTO settings (key, value) VALUES (?, ?)
+        ON CONFLICT(key) DO UPDATE SET value = excluded.value
+    """, (key, value))
+    conn.commit()
+    conn.close()
+    return jsonify({'ok': True})
 
 
 # ─── Admin-only Routes ─────────────────────────────────────────
