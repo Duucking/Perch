@@ -256,6 +256,7 @@ function getThumbUrl(path) {
 }
 
 function onImgLoad(e) {
+  e.target.classList.add('loaded')
   if (!layoutTimer) {
     layoutTimer = setTimeout(() => {
       layout()
