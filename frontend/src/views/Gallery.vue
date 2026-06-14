@@ -49,6 +49,7 @@
               :src="getThumbUrl(item.photo.thumbnail_path)"
               :alt="item.photo.filename"
               class="masonry-img"
+              referrerpolicy="no-referrer"
               @load="onImgLoad($event)"
               @error="onImgLoad($event)"
             />
@@ -255,7 +256,6 @@ function getThumbUrl(path) {
 }
 
 function onImgLoad(e) {
-  e.target.classList.add('loaded')
   if (!layoutTimer) {
     layoutTimer = setTimeout(() => {
       layout()
@@ -422,12 +422,7 @@ function closeModal() {
   object-fit: cover;
   position: relative;
   z-index: 1;
-  transition: transform 0.8s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.5s cubic-bezier(0.16, 1, 0.3, 1);
-  opacity: 0;
-}
-
-.masonry-img.loaded {
-  opacity: 1;
+  transition: transform 0.8s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .masonry-img.loaded ~ .img-skeleton {

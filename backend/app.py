@@ -464,7 +464,10 @@ def api_photo_detail(photo_id):
 @app.route('/api/thumbnails/<path:filename>')
 def api_thumbnail(filename):
     thumb_dir = os.path.join(UPLOAD_FOLDER, 'thumbnails')
-    return send_from_directory(thumb_dir, filename)
+    resp = send_from_directory(thumb_dir, filename)
+    resp.headers['Cache-Control'] = 'public, max-age=86400'
+    resp.headers['Access-Control-Allow-Origin'] = '*'
+    return resp
 
 
 @app.route('/api/download/<int:photo_id>')
@@ -484,7 +487,10 @@ def api_photo_file(photo_id):
     conn.close()
     if not row:
         return jsonify({'error': 'Not found'}), 404
-    return send_file(row['filepath'])
+    resp = send_file(row['filepath'])
+    resp.headers['Cache-Control'] = 'public, max-age=86400'
+    resp.headers['Access-Control-Allow-Origin'] = '*'
+    return resp
 
 
 @app.route('/api/stats', methods=['GET'])
